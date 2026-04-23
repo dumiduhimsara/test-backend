@@ -58,7 +58,6 @@ app.post("/login", async (req, res) => {
     }
 });
 
-// Railway එකට අනිවාර්යයෙන්ම 0.0.0.0 ඕනේ
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is running on port ${PORT}`);
