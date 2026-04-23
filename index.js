@@ -29,6 +29,12 @@ app.use(cors({
 
 app.use(express.json());
 
+
+// අනිත් routes වලට උඩින් මේක දාන්න
+app.get("/", (req, res) => {
+    res.send("Backend is live and running bosa!");
+});
+
 // Register Route
 app.post("/register", async (req, res) => {
     try {
@@ -57,7 +63,8 @@ app.post("/login", async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 8080; // Railway එක 8080 හෝ PORT variable එක පාවිච්චි කරයි
+
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`server is running on port ${PORT}`);
 });
