@@ -38,7 +38,7 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email, password }); // සරලව password එක චෙක් කිරීම
+        const user = await User.findOne({ email, password }); 
         
         if (user) {
             res.status(200).json({ message: "Login Successful", user });
@@ -50,6 +50,6 @@ app.post("/login", async (req, res) => {
     }
 });
 
-app.listen(3000,()=>{
+const PORT = process.env.PORT || 3000;
     console.log("server is running on port 3000");
 });
