@@ -2,37 +2,33 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import dns from 'dns';
-
 import User from './user.js';
-
-dns .setServers(["0.0.0.0","8.8.8.8"]);
 
 dotenv.config();
 
-const app=express();
-const mongourl=process.env.MONGO_URL;
+const app = express();
 
-mongoose.connect(mongourl).then(()=>{
-    console.log("connected to database bosa");
-}).catch((err)=>{
-    console.log(err);
-});
-
+// CORS හරිම විදිහට සෙට් කරමු
 app.use(cors({
-    origin: "*", 
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type"]
 }));
 
-
-
 app.use(express.json());
 
+// ඩේටාබේස් කනෙක්ට් එක
+const mongourl = process.env.MONGO_URL;
+mongoose.connect(mongourl).then(() => {
+    console.log("connected to database bosa");
+}).catch((err) => {
+    console.log("DB Error: ", err);
+});
 
-// අනිත් routes වලට උඩින් මේක දාන්න
+// --- වැදගත්ම කොටස: Health Check ---
+// Railway එකට සර්වර් එක වැඩ කියලා දැනගන්න මේක ඕනේ
 app.get("/", (req, res) => {
-    res.send("Backend is live and running bosa!");
+    res.status(200).send("Backend is Live!");
 });
 
 // Register Route
@@ -52,7 +48,6 @@ app.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email, password }); 
-        
         if (user) {
             res.status(200).json({ message: "Login Successful", user });
         } else {
@@ -63,8 +58,8 @@ app.post("/login", async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 8080; // Railway එක 8080 හෝ PORT variable එක පාවිච්චි කරයි
-
+// Railway එකට අනිවාර්යයෙන්ම 0.0.0.0 ඕනේ
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`server is running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
