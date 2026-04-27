@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import Merchant from './models/Merchant.js'; // නම වෙනස් කළා
+import Merchant from './models/Merchant.js'; 
 import bcrypt from 'bcrypt';
 
 dotenv.config();
@@ -38,7 +38,8 @@ app.post("/register-shop", async (req, res) => {
         const existingShop = await Merchant.findOne({ phone });
         if (existingShop) return res.status(400).json({ message: "Phone number already registered" });
 
-        const newMerchant = new Merchant({ shopName, ownerName, phone, password });
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newMerchant = new Merchant({ shopName, ownerName, phone,shopAddress, nicNumber, password: hashedPassword });
         await newMerchant.save();
         res.status(201).json({ message: "Shop Registered Successfully!" });
     } catch (err) {
