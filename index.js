@@ -32,17 +32,30 @@ app.get("/", (req, res) => {
 // --- Shop Owner Registration ---
 app.post("/register-shop", async (req, res) => {
     try {
-        const { shopName, ownerName, phone, password } = req.body;
+        // 1. req.body එකෙන් අලුත් fields දෙකත් ගන්න (shopAddress, nicNumber) 👇
+        const { shopName, ownerName, phone, shopAddress, nicNumber, password } = req.body;
         
         // කලින් මේ නම්බර් එකෙන් කඩයක් තියෙනවද බලමු
         const existingShop = await Merchant.findOne({ phone });
         if (existingShop) return res.status(400).json({ message: "Phone number already registered" });
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newMerchant = new Merchant({ shopName, ownerName, phone,shopAddress, nicNumber, password: hashedPassword });
+
+        // 2. මෙතනටත් ඒ fields දෙක ඇතුළත් කරන්න 👇
+        const newMerchant = new Merchant({ 
+            shopName, 
+            ownerName, 
+            phone, 
+            shopAddress,  // අලුතින් එක් කළා
+            nicNumber,    // අලුතින් එක් කළා
+            password: hashedPassword 
+        });
+
         await newMerchant.save();
         res.status(201).json({ message: "Shop Registered Successfully!" });
     } catch (err) {
+        // මෙතන console.log එකක් දැම්මොත් ලෙඩේ Railway Logs වල බලාගන්න ලේසියි
+        console.error("Registration Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -51,16 +64,19 @@ app.post("/register-shop", async (req, res) => {
 app.post("/login-shop", async (req, res) => {
     try {
         const { phone, password } = req.body;
-        const merchant = await Merchant.findOne({ phone, password }); 
+        const merchant = await Merchant.findOne({ phone }); 
         
         if (merchant) {
-            res.status(200).json({ 
-                message: "Login Successful", 
-                merchant: { id: merchant._id, shopName: merchant.shopName, ownerName: merchant.ownerName } 
-            });
-        } else {
-            res.status(401).json({ message: "Invalid phone or password" });
+            // Bcrypt පාවිච්චි කරලා පාස්වර්ඩ් එක ගලපලා බලන්න 👇
+            const isMatch = await bcrypt.compare(password, merchant.password);
+            if (isMatch) {
+                return res.status(200).json({ 
+                    message: "Login Successful", 
+                    merchant: { id: merchant._id, shopName: merchant.shopName, ownerName: merchant.ownerName } 
+                });
+            }
         }
+        res.status(401).json({ message: "Invalid phone or password" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
