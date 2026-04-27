@@ -82,6 +82,31 @@ app.post("/login-shop", async (req, res) => {
     }
 });
 
+// --- add customer ---
+
+app.post("/add-customer", async (req, res) => {
+    try {
+        const { name, phone, address, merchantId } = req.body; // ✅ address එකත් ගන්න
+
+        const existingCustomer = await Customer.findOne({ phone });
+        if (existingCustomer) {
+            return res.status(400).json({ message: "මෙම දුරකථන අංකය දැනටමත් පද්ධතියේ ඇත." });
+        }
+
+        const newCustomer = new Customer({
+            name,
+            phone,
+            address, // ✅ ලිපිනය මෙතනට ඇඩ් කරන්න
+            merchantId
+        });
+
+        await newCustomer.save();
+        res.status(201).json({ message: "පාරිභෝගිකයා සාර්ථකව ඇතුළත් කළා! ✅" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
