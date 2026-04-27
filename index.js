@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import Merchant from './models/Merchant.js'; // නම වෙනස් කළා
+import bcrypt from 'bcrypt';
 
 dotenv.config();
 
