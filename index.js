@@ -2,13 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import User from './user.js';
+import Merchant from './models/Merchant.js'; // නම වෙනස් කළා
 
 dotenv.config();
 
 const app = express();
 
-// CORS හරිම විදිහට සෙට් කරමු
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
@@ -17,41 +16,48 @@ app.use(cors({
 
 app.use(express.json());
 
-// ඩේටාබේස් කනෙක්ට් එක
+// Database Connection
 const mongourl = process.env.MONGO_URL;
 mongoose.connect(mongourl).then(() => {
-    console.log("connected to database bosa");
+    console.log("SSK Database Connected! 🚀");
 }).catch((err) => {
     console.log("DB Error: ", err);
 });
 
-// --- වැදගත්ම කොටස: Health Check ---
-// Railway එකට සර්වර් එක වැඩ කියලා දැනගන්න මේක ඕනේ
 app.get("/", (req, res) => {
-    res.status(200).send("Backend is Live!");
+    res.status(200).send("SSK Backend is Live!");
 });
 
-// Register Route
-app.post("/register", async (req, res) => {
+// --- Shop Owner Registration ---
+app.post("/register-shop", async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-        const newUser = new User({ name, email, password });
-        await newUser.save();
-        res.status(201).json({ message: "User Registered!" });
+        const { shopName, ownerName, phone, password } = req.body;
+        
+        // කලින් මේ නම්බර් එකෙන් කඩයක් තියෙනවද බලමු
+        const existingShop = await Merchant.findOne({ phone });
+        if (existingShop) return res.status(400).json({ message: "Phone number already registered" });
+
+        const newMerchant = new Merchant({ shopName, ownerName, phone, password });
+        await newMerchant.save();
+        res.status(201).json({ message: "Shop Registered Successfully!" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Login Route
-app.post("/login", async (req, res) => {
+// --- Shop Owner Login (Phone & Password) ---
+app.post("/login-shop", async (req, res) => {
     try {
-        const { email, password } = req.body;
-        const user = await User.findOne({ email, password }); 
-        if (user) {
-            res.status(200).json({ message: "Login Successful", user });
+        const { phone, password } = req.body;
+        const merchant = await Merchant.findOne({ phone, password }); 
+        
+        if (merchant) {
+            res.status(200).json({ 
+                message: "Login Successful", 
+                merchant: { id: merchant._id, shopName: merchant.shopName, ownerName: merchant.ownerName } 
+            });
         } else {
-            res.status(401).json({ message: "Invalid email or password" });
+            res.status(401).json({ message: "Invalid phone or password" });
         }
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -60,5 +66,5 @@ app.post("/login", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
