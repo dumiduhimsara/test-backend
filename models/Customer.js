@@ -4,6 +4,7 @@ const customerSchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: String, required: true, unique: true },
     address: { type: String }, 
+    debtAmount: { type: Number, default: 0 },
     points: { type: Number, default: 0 },
     merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true },
     createdAt: { type: Date, default: Date.now }
