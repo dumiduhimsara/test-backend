@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import Merchant from './models/Merchant.js'; 
 import bcrypt from 'bcrypt';
+import Customer from './models/Customer.js';
 
 dotenv.config();
 
@@ -46,8 +47,8 @@ app.post("/register-shop", async (req, res) => {
             shopName, 
             ownerName, 
             phone, 
-            shopAddress,  // අලුතින් එක් කළා
-            nicNumber,    // අලුතින් එක් කළා
+            shopAddress, 
+            nicNumber,    
             password: hashedPassword 
         });
 
@@ -86,7 +87,8 @@ app.post("/login-shop", async (req, res) => {
 
 app.post("/add-customer", async (req, res) => {
     try {
-        const { name, phone, address, merchantId } = req.body; // ✅ address එකත් ගන්න
+        // debtAmount එකත් body එකෙන් ගන්නවා 👇
+        const { name, phone, address, debtAmount, merchantId } = req.body; 
 
         const existingCustomer = await Customer.findOne({ phone });
         if (existingCustomer) {
@@ -96,13 +98,15 @@ app.post("/add-customer", async (req, res) => {
         const newCustomer = new Customer({
             name,
             phone,
-            address, // ✅ ලිපිනය මෙතනට ඇඩ් කරන්න
+            address,
+            debtAmount: debtAmount || 0, 
             merchantId
         });
 
         await newCustomer.save();
         res.status(201).json({ message: "පාරිභෝගිකයා සාර්ථකව ඇතුළත් කළා! ✅" });
     } catch (err) {
+        console.error("Add Customer Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
