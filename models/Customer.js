@@ -7,6 +7,7 @@ const customerSchema = new mongoose.Schema({
     debtAmount: { type: Number, default: 0 },
     points: { type: Number, default: 0 },
     merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true },
+    dueDate: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now }
 });
 
