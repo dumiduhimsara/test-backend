@@ -135,6 +135,23 @@ app.put("/update-debt/:id", async (req, res) => {
     }
 });
 
+// index.js (Backend) ඇතුළත
+
+// මුදලාලිට අදාළ සියලුම පාරිභෝගිකයින් ලබා ගැනීම
+app.get("/get-customers/:merchantId", async (req, res) => {
+    try {
+        const { merchantId } = req.params;
+        
+        // Merchant ID එකට ගැලපෙන අය විතරක් සොයනවා
+        const customers = await Customer.find({ merchantId: merchantId });
+        
+        res.status(200).json(customers);
+    } catch (err) {
+        console.error("Fetch Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
