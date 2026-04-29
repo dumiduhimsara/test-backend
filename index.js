@@ -111,6 +111,30 @@ app.post("/add-customer", async (req, res) => {
     }
 });
 
+// index.js (Backend)
+
+// ණය මුදල Update කිරීමේ API එක
+app.put("/update-debt/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amount, type } = req.body; 
+
+        const customer = await Customer.findById(id);
+        if (!customer) return res.status(404).json({ message: "පාරිභෝගිකයා හමු වුණේ නැත." });
+
+        if (type === 'add') {
+            customer.debtAmount += Number(amount);
+        } else if (type === 'settle') {
+            customer.debtAmount -= Number(amount);
+        }
+
+        await customer.save();
+        res.status(200).json({ message: "ණය මුදල සාර්ථකව යාවත්කාලීන කළා! ✅", debtAmount: customer.debtAmount });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
