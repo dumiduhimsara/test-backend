@@ -192,6 +192,21 @@ app.get("/get-history/:customerId", async (req, res) => {
     }
 });
 
+// වැඩිම ණය ඇති පාරිභෝගිකයෝ 5 දෙනා ලබා ගැනීම
+app.get('/api/top-debtors/:merchantId', async (req, res) => {
+    try {
+        const { merchantId } = req.params;
+        
+        const topDebtors = await Customer.find({ merchantId: merchantId })
+            .sort({ debtAmount: -1 }) 
+            .limit(5);
+
+        res.status(200).json(topDebtors);
+    } catch (err) {
+        res.status(500).json({ message: "දත්ත ලබා ගැනීම අසාර්ථකයි", error: err });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
