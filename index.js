@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import Merchant from './models/Merchant.js'; 
 import bcrypt from 'bcrypt';
 import Customer from './models/Customer.js';
+import Transaction from "./models/Transaction.js";
 
 dotenv.config();
 
