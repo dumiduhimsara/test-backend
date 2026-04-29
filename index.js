@@ -152,6 +152,19 @@ app.get("/get-customers/:merchantId", async (req, res) => {
     }
 });
 
+// index.js (Backend)
+
+// පාරිභෝගිකයෙක් ඉවත් කිරීමේ API එක
+app.delete("/delete-customer/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        await Customer.findByIdAndDelete(id);
+        res.status(200).json({ message: "පාරිභෝගිකයා සාර්ථකව ඉවත් කළා! 🗑️" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
