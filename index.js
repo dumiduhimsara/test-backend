@@ -118,33 +118,44 @@ app.post("/add-customer", async (req, res) => {
 app.put("/update-debt/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const { amount, type } = req.body; 
+        const { amount, type, dueDate } = req.body; // ✅ dueDate එක මෙතනට එකතු කළා
 
         const customer = await Customer.findById(id);
         if (!customer) return res.status(404).json({ message: "පාරිභෝගිකයා හමු වුණේ නැත." });
 
-        // 1. පාරිභෝගිකයාගේ මුළු ණය මුදල වෙනස් කිරීම
+        // 1. පාරිභෝගිකයාගේ මුළු ණය මුදල සහ දිනය වෙනස් කිරීම
         if (type === 'add') {
             customer.debtAmount += Number(amount);
+            
+            // ✅ අලුතින් ණයක් එකතු කරන විට පමණක් dueDate එක සේව් කරනවා
+            if (dueDate) {
+                customer.dueDate = new Date(dueDate);
+            }
         } else if (type === 'settle') {
             customer.debtAmount -= Number(amount);
+            
+            // ✅ ණය මුළුමනින්ම ගෙවා අවසන් නම් (0 හෝ ඊට අඩු නම්) දිනය අයින් කරනවා
+            if (customer.debtAmount <= 0) {
+                customer.debtAmount = 0; // සෘණ අගයන් ලැබීම වැළැක්වීමට
+                customer.dueDate = null;
+            }
         }
 
         await customer.save();
 
         // ✅ 2. අලුතින් Transaction එකක් (History එකක්) සේව් කිරීම
-        // මෙතන customer.merchantId පාවිච්චි කරන්නේ ගනුදෙනුව අයිති කාටද කියලා දැනගන්නයි
         const newTransaction = new Transaction({
             customerId: customer._id,
             merchantId: customer.merchantId, 
             amount: Number(amount),
-            type: type
+            type: type,
+            // (අවශ්‍ය නම් Transaction history එකටත් dueDate එක දාන්න පුළුවන්)
         });
 
         await newTransaction.save();
 
         res.status(200).json({ 
-            message: "ණය මුදල සාර්ථකව යාවත්කාලීන කර ඉතිහාසයට ඇතුළත් කළා! ✅", 
+            message: "ණය මුදල සහ ගෙවිය යුතු දිනය සාර්ථකව යාවත්කාලීන කළා! ✅", 
             debtAmount: customer.debtAmount 
         });
 
