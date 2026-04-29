@@ -191,7 +191,7 @@ app.get("/get-history/:customerId", async (req, res) => {
         res.status(500).json(err);
     }
 });
-
+ 
 // වැඩිම ණය ඇති පාරිභෝගිකයෝ 5 දෙනා ලබා ගැනීම
 app.get('/api/top-debtors/:merchantId', async (req, res) => {
     try {
