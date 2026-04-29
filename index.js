@@ -122,6 +122,7 @@ app.put("/update-debt/:id", async (req, res) => {
         const customer = await Customer.findById(id);
         if (!customer) return res.status(404).json({ message: "පාරිභෝගිකයා හමු වුණේ නැත." });
 
+        // 1. පාරිභෝගිකයාගේ මුළු ණය මුදල වෙනස් කිරීම
         if (type === 'add') {
             customer.debtAmount += Number(amount);
         } else if (type === 'settle') {
@@ -129,7 +130,23 @@ app.put("/update-debt/:id", async (req, res) => {
         }
 
         await customer.save();
-        res.status(200).json({ message: "ණය මුදල සාර්ථකව යාවත්කාලීන කළා! ✅", debtAmount: customer.debtAmount });
+
+        // ✅ 2. අලුතින් Transaction එකක් (History එකක්) සේව් කිරීම
+        // මෙතන customer.merchantId පාවිච්චි කරන්නේ ගනුදෙනුව අයිති කාටද කියලා දැනගන්නයි
+        const newTransaction = new Transaction({
+            customerId: customer._id,
+            merchantId: customer.merchantId, 
+            amount: Number(amount),
+            type: type
+        });
+
+        await newTransaction.save();
+
+        res.status(200).json({ 
+            message: "ණය මුදල සාර්ථකව යාවත්කාලීන කර ඉතිහාසයට ඇතුළත් කළා! ✅", 
+            debtAmount: customer.debtAmount 
+        });
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -162,6 +179,15 @@ app.delete("/delete-customer/:id", async (req, res) => {
         res.status(200).json({ message: "පාරිභෝගිකයා සාර්ථකව ඉවත් කළා! 🗑️" });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/get-history/:customerId", async (req, res) => {
+    try {
+        const history = await Transaction.find({ customerId: req.params.customerId }).sort({ date: -1 }); // අලුත්ම ඒවා උඩට එන ලෙස sort කිරීම
+        res.status(200).json(history);
+    } catch (err) {
+        res.status(500).json(err);
     }
 });
 
