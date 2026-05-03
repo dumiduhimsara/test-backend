@@ -134,9 +134,7 @@ app.put("/update-debt/:id", async (req, res) => {
         } else if (type === 'settle') {
             customer.debtAmount -= Number(amount);
             
-            // ✅ ණය මුළුමනින්ම ගෙවා අවසන් නම් (0 හෝ ඊට අඩු නම්) දිනය අයින් කරනවා
-            if (customer.debtAmount <= 0) {
-                customer.debtAmount = 0; // සෘණ අගයන් ලැබීම වැළැක්වීමට
+           if (customer.debtAmount <= 0) {
                 customer.dueDate = null;
             }
         }
@@ -149,7 +147,6 @@ app.put("/update-debt/:id", async (req, res) => {
             merchantId: customer.merchantId, 
             amount: Number(amount),
             type: type,
-            // (අවශ්‍ය නම් Transaction history එකටත් dueDate එක දාන්න පුළුවන්)
         });
 
         await newTransaction.save();
@@ -164,7 +161,22 @@ app.put("/update-debt/:id", async (req, res) => {
     }
 });
 
-// index.js (Backend) ඇතුළත
+app.put("/update-reminder/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { lastRemindedDate, lastRemindedType } = req.body;
+
+        await Customer.findByIdAndUpdate(id, {
+            lastRemindedDate,
+            lastRemindedType
+        });
+
+        res.status(200).json({ message: "Reminder status synced! ✅" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // මුදලාලිට අදාළ සියලුම පාරිභෝගිකයින් ලබා ගැනීම
 app.get("/get-customers/:merchantId", async (req, res) => {

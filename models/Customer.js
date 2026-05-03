@@ -8,6 +8,8 @@ const customerSchema = new mongoose.Schema({
     points: { type: Number, default: 0 },
     merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true },
     dueDate: { type: Date, default: null },
+    lastRemindedDate: { type: String, default: null }, 
+    lastRemindedType: { type: String, default: null },
     createdAt: { type: Date, default: Date.now }
 });
 
