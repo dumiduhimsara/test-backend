@@ -263,6 +263,31 @@ app.get("/get-reports/:merchantId", async (req, res) => {
     }
 });
 
+
+// --- Master Backup Report එක සඳහා සියලුම දත්ත ලබාගැනීම ---
+app.get("/get-master-report/:merchantId", async (req, res) => {
+    try {
+        const { merchantId } = req.params;
+
+        // 1. Merchant ට අදාළ සියලුම පාරිභෝගිකයින් සොයාගන්න
+        const customers = await Customer.find({ merchantId });
+
+        // 2. එක් එක් පාරිභෝගිකයාගේ ගනුදෙනු ඉතිහාසය ලබාගන්න (Promise.all පාවිච්චි කිරීම වේගවත් වේ)
+        const fullReportData = await Promise.all(customers.map(async (customer) => {
+            const transactions = await Transaction.find({ customerId: customer._id }).sort({ date: -1 });
+            return {
+                info: customer,
+                history: transactions
+            };
+        }));
+
+        res.status(200).json(fullReportData);
+    } catch (err) {
+        console.error("Master Report Backend Error:", err);
+        res.status(500).json({ error: "දත්ත ලබාගැනීම අසාර්ථකයි." });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
