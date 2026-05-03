@@ -231,6 +231,38 @@ app.get('/api/top-debtors/:merchantId', async (req, res) => {
     }
 });
 
+app.get("/get-reports/:merchantId", async (req, res) => {
+    try {
+        const { merchantId } = req.params;
+        const { from, to } = req.query; // URL එකෙන් from සහ to දින ලබා ගැනීම
+
+        // 1. තෝරාගත් කාලසීමාව ඇතුළත සහ අදාළ Merchant ට අයිති ගනුදෙනු සෙවීම
+        // මෙතනදී අපි 'customerId' එක හරහා පාරිභෝගිකයාගේ නම ලබාගන්න 'populate' පාවිච්චි කරනවා
+        const transactions = await Transaction.find({
+            merchantId: merchantId,
+            date: {
+                $gte: new Date(from), // සිට (From Date)
+                $lte: new Date(new Date(to).setHours(23, 59, 59, 999)) // දක්වා (To Date) - දවසේ අවසානය දක්වා
+            }
+        })
+        .populate('customerId', 'name') // පාරිභෝගිකයාගේ නම විතරක් ගන්නවා
+        .sort({ date: -1 }); // අලුත්ම ඒවා උඩට
+
+        // 2. Frontend එකේ PDF එකට ගැළපෙන විදිහට දත්ත සකස් කිරීම
+        const reportData = transactions.map(trx => ({
+            date: trx.date,
+            customerName: trx.customerId ? trx.customerId.name : "Unknown Customer",
+            type: trx.type,
+            amount: trx.amount
+   }));
+
+        res.status(200).json(reportData);
+    } catch (err) {
+        console.error("Report Fetch Error:", err);
+        res.status(500).json({ error: "වාර්තා ලබා ගැනීම අසාර්ථකයි." });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
