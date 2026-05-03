@@ -127,21 +127,22 @@ app.put("/update-debt/:id", async (req, res) => {
         if (type === 'add') {
             customer.debtAmount += Number(amount);
             
-            // ✅ අලුතින් ණයක් එකතු කරන විට පමණක් dueDate එක සේව් කරනවා
             if (dueDate) {
                 customer.dueDate = new Date(dueDate);
             }
-        } else if (type === 'settle') {
+     } else if (type === 'settle') {
             customer.debtAmount -= Number(amount);
             
-           if (customer.debtAmount <= 0) {
+            if (customer.debtAmount <= 0) {
                 customer.dueDate = null;
+
+                customer.lastRemindedDate = null;
+                customer.lastRemindedType = null;
             }
         }
 
         await customer.save();
 
-        // ✅ 2. අලුතින් Transaction එකක් (History එකක්) සේව් කිරීම
         const newTransaction = new Transaction({
             customerId: customer._id,
             merchantId: customer.merchantId, 
