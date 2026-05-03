@@ -231,30 +231,32 @@ app.get('/api/top-debtors/:merchantId', async (req, res) => {
     }
 });
 
+// 1. කාලසීමාව අනුව වාර්තා ලබාගැනීම (Filtered)
 app.get("/get-reports/:merchantId", async (req, res) => {
     try {
         const { merchantId } = req.params;
-        const { from, to } = req.query; // URL එකෙන් from සහ to දින ලබා ගැනීම
+        const { from, to } = req.query;
 
-        // 1. තෝරාගත් කාලසීමාව ඇතුළත සහ අදාළ Merchant ට අයිති ගනුදෙනු සෙවීම
-        // මෙතනදී අපි 'customerId' එක හරහා පාරිභෝගිකයාගේ නම ලබාගන්න 'populate' පාවිච්චි කරනවා
         const transactions = await Transaction.find({
             merchantId: merchantId,
             date: {
-                $gte: new Date(from), // සිට (From Date)
-                $lte: new Date(new Date(to).setHours(23, 59, 59, 999)) // දක්වා (To Date) - දවසේ අවසානය දක්වා
+                $gte: new Date(from),
+                $lte: new Date(new Date(to).setHours(23, 59, 59, 999))
             }
         })
-        .populate('customerId', 'name') // පාරිභෝගිකයාගේ නම විතරක් ගන්නවා
-        .sort({ date: -1 }); // අලුත්ම ඒවා උඩට
+        .populate('customerId', 'name') 
+        .sort({ date: -1 });
 
-        // 2. Frontend එකේ PDF එකට ගැළපෙන විදිහට දත්ත සකස් කිරීම
-        const reportData = transactions.map(trx => ({
+        // ✅ පාරිභෝගිකයා ඉවත් කරලා නම් (null නම්) ඒ ගනුදෙනු වාර්තාවෙන් අයින් කරනවා
+        // එතකොට "Unknown Customer" කියලා වාර්තාවේ වැටෙන්නේ නැහැ
+        const validTransactions = transactions.filter(trx => trx.customerId !== null);
+
+        const reportData = validTransactions.map(trx => ({
             date: trx.date,
-            customerName: trx.customerId ? trx.customerId.name : "Unknown Customer",
+            customerName: trx.customerId.name, 
             type: trx.type,
             amount: trx.amount
-   }));
+        }));
 
         res.status(200).json(reportData);
     } catch (err) {
@@ -263,18 +265,19 @@ app.get("/get-reports/:merchantId", async (req, res) => {
     }
 });
 
-
-// --- Master Backup Report එක සඳහා සියලුම දත්ත ලබාගැනීම ---
+// 2. Master Backup Report (Data Cleanup සමඟ)
 app.get("/get-master-report/:merchantId", async (req, res) => {
     try {
         const { merchantId } = req.params;
 
-        // 1. Merchant ට අදාළ සියලුම පාරිභෝගිකයින් සොයාගන්න
+        // 1. Merchant ට අදාළ පාරිභෝගිකයින් සොයාගන්න
         const customers = await Customer.find({ merchantId });
 
-        // 2. එක් එක් පාරිභෝගිකයාගේ ගනුදෙනු ඉතිහාසය ලබාගන්න (Promise.all පාවිච්චි කිරීම වේගවත් වේ)
+        // 2. එක් එක් පාරිභෝගිකයාගේ ගනුදෙනු ලබාගන්න
         const fullReportData = await Promise.all(customers.map(async (customer) => {
             const transactions = await Transaction.find({ customerId: customer._id }).sort({ date: -1 });
+            
+            // ✅ මෙතනදී පාරිභෝගිකයාගේ විස්තර සහ ගනුදෙනු ලැයිස්තුව යවනවා
             return {
                 info: customer,
                 history: transactions
