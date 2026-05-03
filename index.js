@@ -34,16 +34,13 @@ app.get("/", (req, res) => {
 // --- Shop Owner Registration ---
 app.post("/register-shop", async (req, res) => {
     try {
-        // 1. req.body එකෙන් අලුත් fields දෙකත් ගන්න (shopAddress, nicNumber) 👇
         const { shopName, ownerName, phone, shopAddress, nicNumber, password } = req.body;
         
-        // කලින් මේ නම්බර් එකෙන් කඩයක් තියෙනවද බලමු
         const existingShop = await Merchant.findOne({ phone });
         if (existingShop) return res.status(400).json({ message: "Phone number already registered" });
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // 2. මෙතනටත් ඒ fields දෙක ඇතුළත් කරන්න 👇
         const newMerchant = new Merchant({ 
             shopName, 
             ownerName, 
@@ -56,27 +53,41 @@ app.post("/register-shop", async (req, res) => {
         await newMerchant.save();
         res.status(201).json({ message: "Shop Registered Successfully!" });
     } catch (err) {
-        // මෙතන console.log එකක් දැම්මොත් ලෙඩේ Railway Logs වල බලාගන්න ලේසියි
         console.error("Registration Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- Shop Owner Login (Phone & Password) ---
+// --- Shop Owner Login (Security Checks සමඟ) ---
 app.post("/login-shop", async (req, res) => {
     try {
         const { phone, password } = req.body;
         const merchant = await Merchant.findOne({ phone }); 
         
-        if (merchant) {
-            // Bcrypt පාවිච්චි කරලා පාස්වර්ඩ් එක ගලපලා බලන්න 👇
-            const isMatch = await bcrypt.compare(password, merchant.password);
-            if (isMatch) {
-                return res.status(200).json({ 
-                    message: "Login Successful", 
-                    merchant: { id: merchant._id, shopName: merchant.shopName, ownerName: merchant.ownerName } 
-                });
-            }
+        if (!merchant) return res.status(401).json({ message: "Invalid phone or password" });
+
+        // ✅ 1. Admin විසින් Block කර ඇත්නම් ඇතුළු වීමට ඉඩ නොදීම
+        if (merchant.isBlocked) {
+            return res.status(403).json({ message: "ඔබේ ගිණුම තාවකාලිකව අත්හිටුවා ඇත. කරුණාකර සහාය ලබාගන්න." });
+        }
+
+        // ✅ 2. Subscription ඉකුත් වී ඇත්නම් දැනුම් දීම
+        const today = new Date();
+        if (merchant.expiryDate && today > new Date(merchant.expiryDate)) {
+            return res.status(402).json({ message: "ඔබේ ගෙවීම් කාලය අවසන් වී ඇත. කරුණාකර ගිණුම අලුත් කරන්න." });
+        }
+
+        const isMatch = await bcrypt.compare(password, merchant.password);
+        if (isMatch) {
+            return res.status(200).json({ 
+                message: "Login Successful", 
+                merchant: { 
+                    id: merchant._id, 
+                    shopName: merchant.shopName, 
+                    ownerName: merchant.ownerName,
+                    subscriptionStatus: merchant.subscriptionStatus 
+                } 
+            });
         }
         res.status(401).json({ message: "Invalid phone or password" });
     } catch (err) {
@@ -84,11 +95,64 @@ app.post("/login-shop", async (req, res) => {
     }
 });
 
-// --- add customer ---
+// --- SUPER ADMIN APIs (Merchant පාලනය සඳහා) ---
+
+// සියලුම මුදලාලිලාගේ විස්තර පාරිභෝගිකයින් ගණන සමඟ ලබාගැනීම
+app.get("/admin/get-all-merchants", async (req, res) => {
+    try {
+        const merchants = await Merchant.find().select("-password").sort({ createdAt: -1 });
+        
+        const merchantDetails = await Promise.all(merchants.map(async (m) => {
+            const customerCount = await Customer.countDocuments({ merchantId: m._id });
+            return { ...m._doc, customerCount };
+        }));
+
+        res.status(200).json(merchantDetails);
+    } catch (err) {
+        res.status(500).json({ error: "දත්ත ලබාගැනීම අසාර්ථකයි" });
+    }
+});
+
+// කඩයක් Block/Unblock කිරීම
+app.put("/admin/toggle-block/:id", async (req, res) => {
+    try {
+        const merchant = await Merchant.findById(req.params.id);
+        if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+
+        merchant.isBlocked = !merchant.isBlocked;
+        await merchant.save();
+        res.status(200).json({ message: "Status updated", isBlocked: merchant.isBlocked });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Subscription Renew කිරීම (තව දින 30ක් ලබාදීම)
+app.put("/admin/renew-subscription/:id", async (req, res) => {
+    try {
+        const merchant = await Merchant.findById(req.params.id);
+        if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+
+        let newExpiry = new Date();
+        if (merchant.expiryDate && merchant.expiryDate > new Date()) {
+            newExpiry = new Date(merchant.expiryDate);
+        }
+        newExpiry.setDate(newExpiry.getDate() + 30);
+
+        merchant.expiryDate = newExpiry;
+        merchant.subscriptionStatus = 'active';
+        await merchant.save();
+
+        res.status(200).json({ message: "Subscription Renewed!", newExpiry });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Customer & Transactions Management ---
 
 app.post("/add-customer", async (req, res) => {
     try {
-        // debtAmount එකත් body එකෙන් ගන්නවා 👇
         const { name, phone, address, debtAmount, merchantId } = req.body; 
 
         const existingCustomer = await Customer.findOne({ phone });
@@ -107,35 +171,25 @@ app.post("/add-customer", async (req, res) => {
         await newCustomer.save();
         res.status(201).json({ message: "පාරිභෝගිකයා සාර්ථකව ඇතුළත් කළා! ✅" });
     } catch (err) {
-        console.error("Add Customer Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// index.js (Backend)
-
-// ණය මුදල Update කිරීමේ API එක
 app.put("/update-debt/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const { amount, type, dueDate } = req.body; // ✅ dueDate එක මෙතනට එකතු කළා
+        const { amount, type, dueDate } = req.body; 
 
         const customer = await Customer.findById(id);
         if (!customer) return res.status(404).json({ message: "පාරිභෝගිකයා හමු වුණේ නැත." });
 
-        // 1. පාරිභෝගිකයාගේ මුළු ණය මුදල සහ දිනය වෙනස් කිරීම
         if (type === 'add') {
             customer.debtAmount += Number(amount);
-            
-            if (dueDate) {
-                customer.dueDate = new Date(dueDate);
-            }
-     } else if (type === 'settle') {
+            if (dueDate) customer.dueDate = new Date(dueDate);
+        } else if (type === 'settle') {
             customer.debtAmount -= Number(amount);
-            
             if (customer.debtAmount <= 0) {
                 customer.dueDate = null;
-
                 customer.lastRemindedDate = null;
                 customer.lastRemindedType = null;
             }
@@ -153,7 +207,7 @@ app.put("/update-debt/:id", async (req, res) => {
         await newTransaction.save();
 
         res.status(200).json({ 
-            message: "ණය මුදල සහ ගෙවිය යුතු දිනය සාර්ථකව යාවත්කාලීන කළා! ✅", 
+            message: "ණය මුදල සාර්ථකව යාවත්කාලීන කළා! ✅", 
             debtAmount: customer.debtAmount 
         });
 
@@ -162,45 +216,18 @@ app.put("/update-debt/:id", async (req, res) => {
     }
 });
 
-app.put("/update-reminder/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { lastRemindedDate, lastRemindedType } = req.body;
-
-        await Customer.findByIdAndUpdate(id, {
-            lastRemindedDate,
-            lastRemindedType
-        });
-
-        res.status(200).json({ message: "Reminder status synced! ✅" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-
-// මුදලාලිට අදාළ සියලුම පාරිභෝගිකයින් ලබා ගැනීම
 app.get("/get-customers/:merchantId", async (req, res) => {
     try {
-        const { merchantId } = req.params;
-        
-        // Merchant ID එකට ගැලපෙන අය විතරක් සොයනවා
-        const customers = await Customer.find({ merchantId: merchantId });
-        
+        const customers = await Customer.find({ merchantId: req.params.merchantId });
         res.status(200).json(customers);
     } catch (err) {
-        console.error("Fetch Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// index.js (Backend)
-
-// පාරිභෝගිකයෙක් ඉවත් කිරීමේ API එක
 app.delete("/delete-customer/:id", async (req, res) => {
     try {
-        const { id } = req.params;
-        await Customer.findByIdAndDelete(id);
+        await Customer.findByIdAndDelete(req.params.id);
         res.status(200).json({ message: "පාරිභෝගිකයා සාර්ථකව ඉවත් කළා! 🗑️" });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -209,29 +236,15 @@ app.delete("/delete-customer/:id", async (req, res) => {
 
 app.get("/get-history/:customerId", async (req, res) => {
     try {
-        const history = await Transaction.find({ customerId: req.params.customerId }).sort({ date: -1 }); // අලුත්ම ඒවා උඩට එන ලෙස sort කිරීම
+        const history = await Transaction.find({ customerId: req.params.customerId }).sort({ date: -1 });
         res.status(200).json(history);
     } catch (err) {
         res.status(500).json(err);
     }
 });
- 
-// වැඩිම ණය ඇති පාරිභෝගිකයෝ 5 දෙනා ලබා ගැනීම
-app.get('/api/top-debtors/:merchantId', async (req, res) => {
-    try {
-        const { merchantId } = req.params;
-        
-        const topDebtors = await Customer.find({ merchantId: merchantId })
-            .sort({ debtAmount: -1 }) 
-            .limit(5);
 
-        res.status(200).json(topDebtors);
-    } catch (err) {
-        res.status(500).json({ message: "දත්ත ලබා ගැනීම අසාර්ථකයි", error: err });
-    }
-});
+// --- Reports APIs ---
 
-// 1. කාලසීමාව අනුව වාර්තා ලබාගැනීම (Filtered)
 app.get("/get-reports/:merchantId", async (req, res) => {
     try {
         const { merchantId } = req.params;
@@ -247,8 +260,6 @@ app.get("/get-reports/:merchantId", async (req, res) => {
         .populate('customerId', 'name') 
         .sort({ date: -1 });
 
-        // ✅ පාරිභෝගිකයා ඉවත් කරලා නම් (null නම්) ඒ ගනුදෙනු වාර්තාවෙන් අයින් කරනවා
-        // එතකොට "Unknown Customer" කියලා වාර්තාවේ වැටෙන්නේ නැහැ
         const validTransactions = transactions.filter(trx => trx.customerId !== null);
 
         const reportData = validTransactions.map(trx => ({
@@ -260,33 +271,22 @@ app.get("/get-reports/:merchantId", async (req, res) => {
 
         res.status(200).json(reportData);
     } catch (err) {
-        console.error("Report Fetch Error:", err);
         res.status(500).json({ error: "වාර්තා ලබා ගැනීම අසාර්ථකයි." });
     }
 });
 
-// 2. Master Backup Report (Data Cleanup සමඟ)
 app.get("/get-master-report/:merchantId", async (req, res) => {
     try {
         const { merchantId } = req.params;
-
-        // 1. Merchant ට අදාළ පාරිභෝගිකයින් සොයාගන්න
         const customers = await Customer.find({ merchantId });
 
-        // 2. එක් එක් පාරිභෝගිකයාගේ ගනුදෙනු ලබාගන්න
         const fullReportData = await Promise.all(customers.map(async (customer) => {
             const transactions = await Transaction.find({ customerId: customer._id }).sort({ date: -1 });
-            
-            // ✅ මෙතනදී පාරිභෝගිකයාගේ විස්තර සහ ගනුදෙනු ලැයිස්තුව යවනවා
-            return {
-                info: customer,
-                history: transactions
-            };
+            return { info: customer, history: transactions };
         }));
 
         res.status(200).json(fullReportData);
     } catch (err) {
-        console.error("Master Report Backend Error:", err);
         res.status(500).json({ error: "දත්ත ලබාගැනීම අසාර්ථකයි." });
     }
 });
