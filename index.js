@@ -292,7 +292,7 @@ app.get("/get-master-report/:merchantId", async (req, res) => {
             const transactions = await Transaction.find({ customerId: customer._id }).sort({ date: -1 });
             return { info: customer, history: transactions };
         }));
-
+ 
         res.status(200).json(fullReportData);
     } catch (err) {
         res.status(500).json({ error: "දත්ත ලබාගැනීම අසාර්ථකයි." });
