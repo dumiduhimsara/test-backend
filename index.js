@@ -41,17 +41,24 @@ app.post("/register-shop", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // ✅ අලුතින් එකතු කළ කොටස: දින 30ක Free Trial එකක් සැකසීම
+        const trialExpiry = new Date();
+        trialExpiry.setDate(trialExpiry.getDate() + 30);
+
         const newMerchant = new Merchant({ 
             shopName, 
             ownerName, 
             phone, 
             shopAddress, 
             nicNumber,    
-            password: hashedPassword 
+            password: hashedPassword,
+            expiryDate: trialExpiry, // ✅ Trial කාලය ඇතුළත් කිරීම
+            subscriptionStatus: 'active', // ✅ තත්ත්වය active ලෙස දැමීම
+            isBlocked: false // ✅ Default unblocked ලෙස දැමීම
         });
 
         await newMerchant.save();
-        res.status(201).json({ message: "Shop Registered Successfully!" });
+        res.status(201).json({ message: "Shop Registered Successfully with 30-day Free Trial! ✅" });
     } catch (err) {
         console.error("Registration Error:", err);
         res.status(500).json({ error: err.message });
@@ -85,7 +92,8 @@ app.post("/login-shop", async (req, res) => {
                     id: merchant._id, 
                     shopName: merchant.shopName, 
                     ownerName: merchant.ownerName,
-                    subscriptionStatus: merchant.subscriptionStatus 
+                    subscriptionStatus: merchant.subscriptionStatus,
+                    expiryDate: merchant.expiryDate // ✅ Dashboard එකේ Warning එක පෙන්වීමට දිනය යැවීම
                 } 
             });
         }
